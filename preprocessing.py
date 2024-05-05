@@ -59,3 +59,10 @@ def apply_lemmatization(data):
         lemmatized_text = " ".join(lemmatized_tokens)  # Join tokens back into a string
         lemmatized_tweets.append(lemmatized_text)
     return lemmatized_tweets
+
+def apply_all(input_sentences):
+    preprocessed_input_sentences = clean_text(input_sentences)
+    preprocessed_input_sentences = remove_stopwords(preprocessed_input_sentences)
+    preprocessed_input_sentences = apply_stemming(preprocessed_input_sentences)
+    preprocessed_input_sentences = apply_lemmatization(preprocessed_input_sentences)
+    return preprocessed_input_sentences

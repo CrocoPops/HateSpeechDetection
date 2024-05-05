@@ -94,3 +94,23 @@ def test(model, batch_size, test_dl):
             predicted_labels.extend(torch.argmax(logits, axis=1).tolist()) #Extract the max logits value and convert from pytorch to a pyList
             true_labels.extend(labels.tolist()) 
     return true_labels, predicted_labels
+
+def predict_nn(model, tokenizer, sentence):
+    input_ids_gpt2 = tokenizer.encode(sentence, return_tensors='pt').to(DEVICE)
+    attention_mask_gpt2 = torch.ones_like(input_ids_gpt2).to(DEVICE)
+
+    # Generate output for GPT-2
+    with torch.no_grad():
+        outputs = model(input_ids_gpt2, attention_mask=attention_mask_gpt2)
+        predicted_probs = torch.softmax(outputs.logits, dim=1)
+        predicted_class = torch.argmax(outputs.logits, dim=1).item()
+
+    return { "predicted_class" : predicted_class, "prediction_probabilities" : predicted_probs.tolist()[0]}
+
+def predict_lr(model, vectorized_sentence):
+    
+    predicted_class = model.predict(vectorized_sentence)[0]
+    predicted_probs = model.predict_proba(vectorized_sentence)
+
+    return { "predicted_class" : predicted_class, "prediction_probabilities" : predicted_probs[0] }
+    
