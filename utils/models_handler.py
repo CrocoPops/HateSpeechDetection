@@ -1,15 +1,24 @@
 import torch
+import os
+import pandas 
 
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from tqdm import tqdm
+from joblib import load
+from transformers import GPT2Config, GPT2Tokenizer, GPT2ForSequenceClassification, BertTokenizer, BertForSequenceClassification, XLNetTokenizer, XLNetForSequenceClassification
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import LogisticRegression
+
+from utils.constants import DEVICE
 
 from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter(log_dir="./logs")
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+#######################
+#       LEARNING      #
+#######################
 def train(model, epochs, lr, batch_size, train_ds, test_ds, logger_suffix):
     all_loss = {'train_loss':[], 'val_loss':[]}
     all_acc = {'train_acc':[], 'val_acc':[]}
@@ -26,7 +35,9 @@ def train(model, epochs, lr, batch_size, train_ds, test_ds, logger_suffix):
         total_samples_train = 0
         for batch in train_dl:
             input_ids, attention_mask, labels = batch
+            print("DC: ", input_ids)
             input_ids, attention_mask, labels = input_ids.to(DEVICE), attention_mask.to(DEVICE), labels.to(DEVICE)
+
 
             optimizer.zero_grad()
 
@@ -95,6 +106,9 @@ def test(model, batch_size, test_dl):
             true_labels.extend(labels.tolist()) 
     return true_labels, predicted_labels
 
+#######################
+#     PREDICTIONS     #
+#######################
 def predict_nn(model, tokenizer, sentence):
     input_ids_gpt2 = tokenizer.encode(sentence, return_tensors='pt').to(DEVICE)
     attention_mask_gpt2 = torch.ones_like(input_ids_gpt2).to(DEVICE)
@@ -113,4 +127,67 @@ def predict_lr(model, vectorized_sentence):
     predicted_probs = model.predict_proba(vectorized_sentence)
 
     return { "predicted_class" : predicted_class, "prediction_probabilities" : predicted_probs[0] }
+
+def get_gpt2(trained = False):
+    tokenizer_gpt2 = GPT2Tokenizer.from_pretrained('gpt2')
+    tokenizer_gpt2.pad_token = tokenizer_gpt2.eos_token  # Set padding token to eos_token
+    model_config_gpt2 = GPT2Config.from_pretrained('gpt2', num_labels=3, pad_token_id=tokenizer_gpt2.pad_token_id)
+    model_gpt2 = GPT2ForSequenceClassification.from_pretrained('gpt2', num_labels=3, pad_token_id=tokenizer_gpt2.pad_token_id).to(DEVICE)   
+
+    if trained:
+        model_gpt2.load_state_dict(torch.load(os.path.join(os.getcwd(), "models", "gpt2_model.pth"), map_location = DEVICE))  # Load pre-trained GPT-2 model from disk
+
+
+    return model_gpt2, tokenizer_gpt2
+
+#######################
+#    MODEL GETTERS    #
+#######################
+def get_bert(trained = False):
+    tokenizer_bert = BertTokenizer.from_pretrained('bert-base-uncased')
+    model_bert = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=3).to(DEVICE)
+
+    if trained:
+        model_bert.load_state_dict(torch.load(os.path.join(os.getcwd(), "models", "bert_model.pth"), map_location = DEVICE))  # Load pre-trained BERT model from disk
+
+    return model_bert, tokenizer_bert
+
+def get_xlnet(trained = False):
+    tokenizer_xlnet = XLNetTokenizer.from_pretrained("xlnet-base-cased")
+    model_xlnet = XLNetForSequenceClassification.from_pretrained("xlnet-base-cased", num_labels=3).to(DEVICE)
+
+    if trained:
+        model_xlnet.load_state_dict(torch.load(os.path.join(os.getcwd(), "models", "xlnet_model.pth"), map_location = DEVICE))  # Load pre-trained BERT model from disk
+
+    return model_xlnet, tokenizer_xlnet
+
+def get_logreg(trained = False):
+    vectorizer_logreg = CountVectorizer()
+
+    # Fit and transform the data
     
+    data = pandas.read_csv('cleaned_data.csv')
+    vectorizer_logreg.fit(list(data["text"].values.astype('U')))
+
+    model_logreg = LogisticRegression()
+
+    if trained:
+        model_logreg = load(os.path.join(os.getcwd(), "models", "LogisticRegression_model.joblib"))
+
+    return model_logreg, vectorizer_logreg
+
+def get_accuracies():
+    accuracies = {}
+    with open(os.path.join(os.getcwd(), "accuracies", "accuracy_bert.txt"), "r") as file:
+        accuracies['bert'] = float(file.read())
+
+    with open(os.path.join(os.getcwd(), "accuracies", "accuracy_gpt2.txt"), "r") as file:
+        accuracies['gpt2']  = float(file.read())
+
+    with open(os.path.join(os.getcwd(), "accuracies", "accuracy_xlnet.txt"), "r") as file:
+        accuracies['xlnet']  = float(file.read())
+
+    with open(os.path.join(os.getcwd(), "accuracies", "accuracy_LR.txt"), "r") as file:
+        accuracies['lr']  = float(file.read())
+
+    return accuracies
