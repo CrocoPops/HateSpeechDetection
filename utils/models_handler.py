@@ -9,8 +9,9 @@ from joblib import load
 from transformers import GPT2Config, GPT2Tokenizer, GPT2ForSequenceClassification, BertTokenizer, BertForSequenceClassification, XLNetTokenizer, XLNetForSequenceClassification
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 
-from utils.constants import DEVICE
+from utils.constants import DEVICE, RANDOM_STATE, TEST_SIZE
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -165,9 +166,10 @@ def get_logreg(trained = False):
     vectorizer_logreg = CountVectorizer()
 
     # Fit and transform the data
-    
     data = pandas.read_csv('cleaned_data.csv')
-    vectorizer_logreg.fit(list(data["text"].values.astype('U')))
+    X_train, _ = train_test_split(data["text"], test_size=TEST_SIZE, random_state=RANDOM_STATE)
+
+    vectorizer_logreg.fit(list(X_train.values.astype('U')))
 
     model_logreg = LogisticRegression()
 
