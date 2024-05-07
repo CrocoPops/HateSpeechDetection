@@ -1,5 +1,7 @@
 import torch
+import numpy as np
 from utils.constants import DEVICE
+from operator import add
 
 # accuracies is a dictionary, possible values:
 # accuracies['gpt2'], accuracies['lr'], accuracies['bert']
@@ -67,3 +69,32 @@ class Plurality(MultiAgentVotingRule):
         predicted_class = counter.index(max(counter))
         self.update_metrics(predicted_class, label)
         return predicted_class
+
+class Borda(MultiAgentVotingRule):
+
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, accuracies, predictions, label):
+        scores = [0, 0, 0]
+        num_classes = 3 
+
+        # Calculate Borda scores
+        for value in predictions.values():
+            scores = list(map(add, scores, self.get_borda_scores(value['prediction_probabilities'])))
+
+        predicted_class = scores.index(max(scores))
+        self.update_metrics(predicted_class, label)
+        return predicted_class
+
+
+    def get_borda_scores(self, probabilities):
+        sorted_indices = np.argsort(probabilities)
+
+        # Create a new array with assigned values
+        borda_scores = np.zeros_like(probabilities)
+        borda_scores[sorted_indices[0]] = 1  # Lowest value gets 1
+        borda_scores[sorted_indices[1]] = 2  # Middle value gets 2
+        borda_scores[sorted_indices[2]] = 3
+
+        return list(borda_scores)
